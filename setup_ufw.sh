@@ -2,7 +2,7 @@
 
 # FILE: setup_ufw.sh
 # DESCRIPTION: Script to set up UFW (Firewall)
-# This script is designed to be called from the main setup_all.sh script.
+# This script is designed to be called from the main complete_setup.sh script.
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
@@ -22,7 +22,7 @@ ufw allow 53/udp         # Port 53 (DNS UDP) - For queries
 ufw allow 67/udp         # Port 67 (DHCP Server) - For client requests
 ufw allow 80/tcp         # Port 80 (HTTP) - For Pi-hole Web Interface
 ufw allow 123/udp        # Port 123 (NTP) - For time synchronization
-ufw allow proto vrrp     # VRRP - For Keepalived high availability
+ufw allow proto 112      # VRRP - For Keepalived high availability
 
 ### Enable Firewall
 # Prevents installer from hanging at "Are you sure?"

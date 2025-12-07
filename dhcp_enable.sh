@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# FILE: manual_dhcp_enable.sh
+# FILE: dhcp_enable.sh
 # DESCRIPTION: Manually enable Pi-hole DHCP on secondary server
 # USE CASE: Run this on the SECONDARY when the primary is offline
 #           and you need to restore DHCP services manually
@@ -10,7 +10,7 @@ set -e
 SETUPVARS="/etc/pihole/setupVars.conf"
 
 echo "=============================================================="
-echo "                  Manual DHCP Enable Script"
+echo "                  MANUAL DHCP ENABLE SCRIPT"
 echo "=============================================================="
 echo ""
 
@@ -81,11 +81,11 @@ echo "Restarting Pi-hole DNS service..."
 pihole restartdns
 
 ### Verify DHCP is enabled
-# Exponential backoff, max ~31 seconds).
-eecho "Verifying DHCP activation..."
+# Exponential backoff, max ~31 seconds.
+echo "Verifying DHCP activation..."
 SUCCESS=false
 WAIT=1
-for i in {1..5}; do
+for i in {1..6}; do
     NEW_STATUS=$(grep "^DHCP_ACTIVE=" "$SETUPVARS" | cut -d= -f2)
     
     if [ "$NEW_STATUS" = "true" ]; then
@@ -93,7 +93,7 @@ for i in {1..5}; do
         break
     fi
     
-    if [ $i -lt 5 ]; then
+    if [ $i -lt 6 ]; then
         echo "Attempt $i: DHCP not yet activated, waiting ${WAIT}s before retry..."
         sleep $WAIT
         WAIT=$((WAIT * 2))  # Double the wait time: 1, 2, 4, 8, 16 seconds
@@ -101,7 +101,7 @@ for i in {1..5}; do
 done
 
 
-if [ "$NEW_STATUS" = "true" ]; then
+if [ "$SUCCESS" = "true" ]; then
     echo ""
     echo "=============================================================="
     echo "                  DHCP ENABLED SUCCESSFULLY"
@@ -115,10 +115,10 @@ if [ "$NEW_STATUS" = "true" ]; then
     echo "  - Do NOT bring the Ravage back online with DHCP enabled"
     echo "  - Run manual-dhcp-disable.sh when Ravage is restored"
     echo "=============================================================="
+    # Log the action
+    logger -t pihole-dhcp "DHCP manually enabled on Howlback"   
 else
     echo "ERROR: Failed to enable DHCP" >&2
+    logger -t pihole-dhcp "ERROR: Failed to manually enable DHCP on Howlback"
     exit 1
 fi
-
-# Log the action
-logger -t pihole-dhcp "DHCP manually enabled on Howlback"

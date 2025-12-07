@@ -1,7 +1,4 @@
 # Howlback - Automated Pi-hole High Availability Setup (Secondary)
-An automated Debian installation system for deploying a highly-available Pi-hole DNS server with ad-blocking, DHCP, and recursive DNS resolution.
-
-Overview
 This repository contains scripts to build Howlback, the secondary Pi-hole server with:
 
 Pi-hole - Network-wide ad blocking

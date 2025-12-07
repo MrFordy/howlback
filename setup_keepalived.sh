@@ -4,7 +4,7 @@
 # DESCRIPTION: A script to install and configure Keepalived for high availability.
 # This script sets up a VRRP instance to manage a virtual IP address, making
 # the Pi-hole service redundant. It is designed to be called from the main 
-# setup_all.sh script with the Keepalived password as an argument.
+# complete_setup.sh script with the Keepalived password as an argument.
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
@@ -38,6 +38,7 @@ echo "Primary network interface detected: $PRIMARY_INTERFACE"
 # This configuration defines a VRRP instance that will manage the virtual IP.
 # This server is configured as the MASTER. Other nodes should be set to BACKUP.
 echo "Creating Keepalived configuration file..."
+mkdir -p /etc/keepalived
 cat > /etc/keepalived/keepalived.conf << EOF
 vrrp_instance VI_1 {
     # This server is the secondary (BACKUP). Other nodes should be MASTER.
@@ -85,36 +86,43 @@ else
     exit 1
 fi
 
-### Wait for the virtual IP to be assigned
-# Exponential backoff, max ~31 seconds.
-echo "Verifying virtual IP address..."
+### Wait for Keepalived to initialize
+# On a BACKUP node, the virtual IP will only be assigned if the MASTER is down.
+# Therefore, we verify that Keepalived is running properly rather than checking
+# for VIP assignment.
+echo "Verifying Keepalived initialization..."
 SUCCESS=false
 WAIT=1
-for i in {1..5}; do
-    if ip addr show $PRIMARY_INTERFACE | grep -q "192.168.0.2"; then
-        echo "Virtual IP 192.168.0.2 is correctly configured on $PRIMARY_INTERFACE."
+for i in {1..6}; do
+    # Check if Keepalived is running and has initialized VRRP
+    if systemctl is-active --quiet keepalived && \
+       journalctl -u keepalived -n 50 | grep -q "VRRP_Instance(VI_1)"; then
+        echo "Keepalived has initialized successfully."
         SUCCESS=true
         break
     fi
-    if [ $i -lt 5 ]; then
-        echo "Attempt $i: Virtual IP not yet assigned, waiting ${WAIT}s before retry..."
+    if [ $i -lt 6 ]; then
+        echo "Attempt $i: Keepalived not fully initialized, waiting ${WAIT}s before retry..."
         sleep $WAIT
-        WAIT=$((WAIT * 2))  # Double the wait time: 1, 2, 4, 8, 16 seconds
+        WAIT=$((WAIT * 2))  # Double the wait time: 1, 2, 4, 8, 16 seconds.
     fi
 done
 
 if [ "$SUCCESS" = false ]; then
-    echo "ERROR: Virtual IP address was not assigned after multiple attempts."
+    echo "ERROR: Keepalived failed to initialize properly after multiple attempts."
     echo "Check Keepalived logs with: journalctl -u keepalived -n 20"
     exit 1
 fi
 
-### Check if the virtual IP is present on the interface
-echo "Verifying virtual IP address..."
-if ip addr show $PRIMARY_INTERFACE | grep -q "192.168.0.2"; then
-    echo "Virtual IP 192.168.0.2 is correctly configured on $PRIMARY_INTERFACE."
+# Check if this node has the virtual IP (indicates MASTER state or MASTER is down)
+if ip addr show "$PRIMARY_INTERFACE" | grep -q "192.168.0.2"; then
+    echo "WARNING: Virtual IP 192.168.0.2 is assigned to this BACKUP node."
+    echo "This means either:"
+    echo "  1. The MASTER node (Ravage) is currently offline, OR"
+    echo "  2. There is a configuration issue"
+    echo "If Ravage should be online, investigate immediately."
 else
-    echo "WARNING: Virtual IP address was not found. Check Keepalived logs."
+    echo "Virtual IP is not assigned (normal for Howlback when Ravage is online)."
 fi
 
 ### Completion Message
@@ -122,4 +130,7 @@ echo ""
 echo "=============================================================="
 echo "                   Keepalived Setup Complete"
 echo "=============================================================="
+echo "Node Role: BACKUP"
+echo "Virtual IP: 192.168.0.2 (will be assigned if MASTER fails)"
+echo "Keepalived is monitoring MASTER at: 192.168.0.250"
 echo ""

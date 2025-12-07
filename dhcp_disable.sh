@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# FILE: manual_dhcp_disable.sh
+# FILE: dhcp_disable.sh
 # DESCRIPTION: Manually disable Pi-hole DHCP on secondary server
 # USE CASE: Run this on the SECONDARY after the primary is back online
 #           to return to normal operation
@@ -10,7 +10,7 @@ set -e
 SETUPVARS="/etc/pihole/setupVars.conf"
 
 echo "=============================================================="
-echo "                  Manual DHCP Disable Script"
+echo "                  MANUAL DHCP DISABLE SCRIPT"
 echo "=============================================================="
 echo ""
 
@@ -76,9 +76,9 @@ done
 
 if [ "$SUCCESS" = true ]; then
     echo ""
-    echo "=============================================================="
-    echo "                 DHCP DISABLED SUCCESSFULLY"
-    echo "=============================================================="
+    echo "====================================================================="
+    echo "                     DHCP DISABLED SUCCESSFULLY"
+    echo "====================================================================="
     echo "Server: Howlback"
     echo "Status: INACTIVE"
     echo ""
@@ -86,7 +86,7 @@ if [ "$SUCCESS" = true ]; then
     echo "  - DNS queries: Still being answered"
     echo "  - DHCP: Disabled (Ravage should handle this)"
     echo "  - Normal operation restored"
-    echo "=============================================================="
+    echo "====================================================================="
 else
     echo "ERROR: Failed to disable DHCP" >&2
     exit 1

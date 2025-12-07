@@ -3,7 +3,7 @@
 # FILE: setup_unbound.sh
 # DESCRIPTION: A script to install and configure Unbound as a fully recursive DNS resolver
 # with security and privacy hardening. 
-# This script is designed to be called from the main setup_all.sh script.
+# This script is designed to be called from the main complete_setup.sh script.
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
@@ -13,7 +13,8 @@ echo "Setting up Unbound DNS resolver..."
 ### Download Root Hints
 # This file is essential for Unbound to resolve top-level domains from the root servers.
 echo "Downloading root hints file..."
-wget -O /var/lib/unbound/root.hints https://www.internic.net/domain/named.root
+mkdir -p /var/lib/unbound
+curl -o /var/lib/unbound/root.hints https://www.internic.net/domain/named.root
 if [ ! -s /var/lib/unbound/root.hints ]; then
     echo "ERROR: Failed to download root.hints"
     exit 1
@@ -140,7 +141,7 @@ if [ $? -eq 0 ]; then
     echo "Unbound is working correctly."
 else
     echo "ERROR: Unbound test failed. Check the logs for unbound."
-    # The script will exit with an error code, which is good practice.
+    # The script will exit with an error code.
     exit 1
 fi
 

@@ -2,7 +2,7 @@
 
 # FILE: setup_pihole.sh
 # DESCRIPTION: A script to install and configure Pi-hole with a secure setup.
-# This script is designed to be called from the main setup_all.sh script.
+# This script is designed to be called from the main complete_setup.sh script.
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
@@ -36,13 +36,19 @@ export PIHOLE_SKIP_INSTALL_CHECK=true
 
 ### Download and run the Pi-hole installer script
 # The installer is fetched and piped directly to bash for execution
-PIHOLE_INSTALLER=$(curl -fsSL https://install.pi-hole.net)
-if [ $? -eq 0 ]; then
-    echo "$PIHOLE_INSTALLER" | bash /dev/stdin
-else
-    echo "ERROR: Failed to download Pi-hole installer"
+echo "Downloading Pi-hole installer..."
+if ! PIHOLE_INSTALLER=$(curl -fsSL https://install.pi-hole.net); then
+    echo "ERROR: Failed to download Pi-hole installer" >&2
     exit 1
 fi
+
+if [ -z "$PIHOLE_INSTALLER" ]; then
+    echo "ERROR: Pi-hole installer downloaded but is empty" >&2
+    exit 1
+fi
+
+echo "Running Pi-hole installer..."
+echo "$PIHOLE_INSTALLER" | bash /dev/stdin
 
 ### Set password for the Pi-hole web interface
 echo "Applying Pi-hole password..."
@@ -58,31 +64,42 @@ pihole -g
 ### Add static DHCP leases from a separate file
 # IP allocation explained in 04-pihole-static-dhcp.conf
 echo "Adding static DHCP leases from separate file..."
-if [ ! -f "/root/setup_scripts/04-pihole-static-dhcp.conf" ]; then
+if [ ! -f "/opt/setup_scripts/04-pihole-static-dhcp.conf" ]; then
     echo "WARNING: No static DHCP leases file found. Skipping static lease configuration."
 else
-    cp /root/setup_scripts/04-pihole-static-dhcp.conf /etc/dnsmasq.d/04-pihole-static-dhcp.conf
+    cp /opt/setup_scripts/04-pihole-static-dhcp.conf /etc/dnsmasq.d/04-pihole-static-dhcp.conf
     pihole restartdns
 fi
 
 ### Final system configuration
 echo "Configuring host system DNS to use Pi-hole..."
+# Remove symlink if it exists (doesn't error if file is already a regular file)
+rm -f /etc/resolv.conf
+# Create new regular file with Pi-hole DNS
 echo "nameserver 127.0.0.1" > /etc/resolv.conf
+# Make it immutable to prevent other services from changing it
+# (Optional safeguard - fails silently if not supported)
+chattr +i /etc/resolv.conf 2>/dev/null || true
 
 ### Test Pi-hole to ensure it is working correctly
 echo "Testing Pi-hole ad-blocking..."
-if dig @127.0.0.1 doubleclick.net | grep "0.0.0.0" > /dev/null; then
+BLOCKED_RESULT=$(dig @127.0.0.1 doubleclick.net +short)
+if echo "$BLOCKED_RESULT" | grep -qE "^(0\.0\.0\.0|::)$"; then
     echo "Pi-hole is blocking ads correctly. Test successful."
 else
-    echo "ERROR: Pi-hole test failed. 'doubleclick.net' was not blocked."
+    echo "ERROR: Pi-hole test failed. 'doubleclick.net' was not blocked." >&2
+    echo "Expected: 0.0.0.0 or ::" >&2
+    echo "Got: $BLOCKED_RESULT" >&2
     exit 1
 fi
 
 echo "Testing Pi-hole resolves a legitimate domain..."
-if dig @127.0.0.1 google.com | grep -v "0.0.0.0" > /dev/null; then
+RESOLVED_RESULT=$(dig @127.0.0.1 google.com +short)
+if [ -n "$RESOLVED_RESULT" ] && ! echo "$RESOLVED_RESULT" | grep -qE "^(0\.0\.0\.0|::)$"; then
     echo "Pi-hole is resolving legitimate domains correctly. Test successful."
 else
-    echo "ERROR: Pi-hole test failed. 'google.com' was incorrectly blocked."
+    echo "ERROR: Pi-hole test failed. 'google.com' could not be resolved." >&2
+    echo "Got: $RESOLVED_RESULT" >&2
     exit 1
 fi
 
